@@ -10,6 +10,7 @@ import android.support.v7.app.AppCompatActivity
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
+import timber.log.Timber
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
@@ -17,19 +18,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         getSystemService(Context.SENSOR_SERVICE) as SensorManager
     }
 
-    val accelerometerSensor by lazy {
-        sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    }
-
     val lineChart by lazy {
         findViewById(R.id.line_chart) as LineChart;
     }
-    val filterdLineChart by lazy {
+    val incrementLineChart by lazy {
         findViewById(R.id.line_chart_2) as LineChart;
     }
 
     val originData = AccelerometerData()
     val incrementAcceleration = AccelerometerData() // 瞬間的な増分データ
+
+    var coordinate: Coordinate? = null
+    var calcTime: Long = 0L;
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             data.addDataSet(originData.dataSetY)
             data.addDataSet(originData.dataSetZ)
         }
-        filterdLineChart.run {
+        incrementLineChart.run {
             data = LineData()
             data.addDataSet(incrementAcceleration.dataSetX)
             data.addDataSet(incrementAcceleration.dataSetY)
@@ -51,7 +51,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
-        sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        // 加速度センサー
+        sensorManager.registerListener(this
+                , sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+                , SensorManager.SENSOR_DELAY_NORMAL)
+        // 地磁気センサー
+        sensorManager.registerListener(this
+                , sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+                , SensorManager.SENSOR_DELAY_NORMAL)
     }
 
     override fun onPause() {
@@ -66,7 +73,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         when (p0.sensor?.type) {
             Sensor.TYPE_ACCELEROMETER -> {
                 //Timber.d("onSensorChanged : x[${x}] y[${y}] z[${z}]")
-
                 originData.run {
                     addValues(p0.values.toTypedArray())
 
@@ -74,7 +80,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     lineY.add(Entry(lowPassY, dataSetY.entryCount))
                     lineZ.add(Entry(lowPassZ, dataSetZ.entryCount))
                 }
-
                 incrementAcceleration.run {
                     addValues(p0.values.toTypedArray())
 
@@ -82,9 +87,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     lineY.add(Entry(rawAY, dataSetY.entryCount))
                     lineZ.add(Entry(rawAZ, dataSetZ.entryCount))
                 }
-
                 invalidateChart(lineChart)
-                invalidateChart(filterdLineChart)
+                invalidateChart(incrementLineChart)
+
+                val time: Long = System.currentTimeMillis()
+                val interval: Long = time - calcTime
+                calcTime = time;
+
+                if (time == interval) return // 初回なら抜ける
+
+                coordinate?.let {
+                    it.calc(incrementAcceleration, interval)
+                    Timber.d("coordinate : ${it.toString()}")
+                }
+            }
+
+            Sensor.TYPE_MAGNETIC_FIELD -> {
+                coordinate = Coordinate(p0.values)
             }
         }
     }
