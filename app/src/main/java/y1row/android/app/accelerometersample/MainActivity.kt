@@ -8,6 +8,7 @@ import android.hardware.SensorManager
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
@@ -28,7 +29,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     val originData = AccelerometerData()
-    val filterdData = AccelerometerData()
+    val incrementAcceleration = AccelerometerData() // 瞬間的な増分データ
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,9 +43,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
         filterdLineChart.run {
             data = LineData()
-            data.addDataSet(filterdData.dataSetX)
-            data.addDataSet(filterdData.dataSetY)
-            data.addDataSet(filterdData.dataSetZ)
+            data.addDataSet(incrementAcceleration.dataSetX)
+            data.addDataSet(incrementAcceleration.dataSetY)
+            data.addDataSet(incrementAcceleration.dataSetZ)
         }
     }
 
@@ -66,8 +67,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             Sensor.TYPE_ACCELEROMETER -> {
                 //Timber.d("onSensorChanged : x[${x}] y[${y}] z[${z}]")
 
-                originData.addValues(p0.values.toTypedArray(), false)
-                filterdData.addValues(p0.values.toTypedArray())
+                originData.run {
+                    addValues(p0.values.toTypedArray())
+
+                    lineX.add(Entry(lowPassX, dataSetX.entryCount))
+                    lineY.add(Entry(lowPassY, dataSetY.entryCount))
+                    lineZ.add(Entry(lowPassZ, dataSetZ.entryCount))
+                }
+
+                incrementAcceleration.run {
+                    addValues(p0.values.toTypedArray())
+
+                    lineX.add(Entry(rawAX, dataSetX.entryCount))
+                    lineY.add(Entry(rawAY, dataSetY.entryCount))
+                    lineZ.add(Entry(rawAZ, dataSetZ.entryCount))
+                }
 
                 invalidateChart(lineChart)
                 invalidateChart(filterdLineChart)

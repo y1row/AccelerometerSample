@@ -15,10 +15,16 @@ class AccelerometerData {
     val dataSetY = LineDataSet(lineY, "Y")
     val dataSetZ = LineDataSet(lineZ, "Z")
 
-    var isFirst: Boolean = false
-    var lastX: Float = 0.0f
-    var lastY: Float = 0.0f
-    var lastZ: Float = 0.0f
+    var isFirst: Boolean = true
+    val MOD_FILTER = 0.1f
+    var lowPassX: Float = 0.0f
+    var lowPassY: Float = 0.0f
+    var lowPassZ: Float = 0.0f
+
+    // 瞬間的な加速度の増分
+    var rawAX: Float = 0.0f
+    var rawAY: Float = 0.0f
+    var rawAZ: Float = 0.0f
 
     init {
         dataSetX.fillColor = Color.RED
@@ -45,18 +51,21 @@ class AccelerometerData {
         var y = values[1]
         var z = values[2]
 
+        // Low Pass Filter
         if (isFirst.not() && enableFilter) {
-            x = (0.9f * lastX + 0.1f * x)
-            y = (0.9f * lastY + 0.1f * y)
-            z = (0.9f * lastZ + 0.1f * z)
+            lowPassX += (x - lowPassX) * MOD_FILTER
+            lowPassY += (y - lowPassY) * MOD_FILTER
+            lowPassZ += (z - lowPassZ) * MOD_FILTER
+        } else {
+            lowPassX = x
+            lowPassY = y
+            lowPassZ = z
         }
-        lastX = x
-        lastY = y
-        lastZ = z
+        isFirst = false
 
-        lineX.add(Entry(x, dataSetX.entryCount))
-        lineY.add(Entry(y, dataSetY.entryCount))
-        lineZ.add(Entry(z, dataSetZ.entryCount))
+        rawAX = x - lowPassX
+        rawAY = y - lowPassY
+        rawAZ = z - lowPassZ
     }
 
 }
